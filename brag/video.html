@@ -1,0 +1,82 @@
+<!doctype html>
+<meta charset="utf-8" />
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1200px; height:730px; background:#010409; overflow:hidden; }
+  body { display:flex; align-items:center; justify-content:center;
+         font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .term { width:1120px; height:664px; background:#0d1117; border:1px solid #30363d;
+          border-radius:10px; box-shadow:0 24px 70px rgba(0,0,0,.6); overflow:hidden; }
+  .bar { height:34px; background:#161b22; border-bottom:1px solid #30363d;
+         display:flex; align-items:center; padding:0 14px; gap:8px; }
+  .dot { width:11px; height:11px; border-radius:50%; }
+  .title { color:#6e7681; font-size:12px; margin-left:10px; letter-spacing:.3px; }
+  .body { padding:18px 24px; font-size:16.5px; line-height:1.62; color:#c9d1d9;
+          white-space:pre; }
+  .l { opacity:0; }
+  .l.on { opacity:1; }
+  .dim { color:#6e7681; }
+  .cy  { color:#58a6ff; }
+  .gn  { color:#3fb950; }
+  .yl  { color:#d29922; }
+  .rd  { color:#f85149; }
+  .big { color:#f0f6fc; font-weight:600; }
+  .hl  { background:#1f6feb33; border-left:3px solid #58a6ff; margin-left:-24px;
+         padding-left:21px; }
+  .cursor { background:#c9d1d9; color:#0d1117; }
+</style>
+<div class="term">
+  <div class="bar">
+    <div class="dot" style="background:#ff5f56"></div>
+    <div class="dot" style="background:#ffbd2e"></div>
+    <div class="dot" style="background:#27c93f"></div>
+    <div class="title">shadowjoin — measuring a join nobody thought was broken</div>
+  </div>
+  <div class="body" id="out"></div>
+</div>
+<script>
+const CMD = "npx shadowjoin scan --left countries_ui.csv --right countries_un.csv --key country";
+// Every figure below is verbatim CLI output from:
+//   node dist/cli.js scan --left examples/countries_ui.csv --left-key country --left-truth iso3 \
+//     --right examples/countries_reference.csv --right-key country --right-truth iso3
+const LINES = [
+  [3.1,  '<span class="dim">  left rows 249   right rows 249</span>'],
+  [3.4,  ''],
+  [3.7,  '  exact join matches              <span class="big">205</span>   <span class="gn">82.33%</span>   <span class="dim">← looks fine</span>'],
+  [4.6,  '  recovered by shadow join          <span class="big">5</span>   <span class="yl">2.01%</span>'],
+  [5.0,  '  still unexplained                <span class="dim">39</span>'],
+  [5.3,  ''],
+  [5.8,  '  <span class="big">LOWER BOUND ON LOST MATCHES: 2.01% of left rows</span>', 'hl'],
+  [6.6,  '  <span class="dim">verified against ground truth:</span> <span class="gn">5 correct, 0 wrong</span>  <span class="dim">(precision 100%)</span>'],
+  [7.1,  ''],
+  [7.4,  '  <span class="dim">rules worth adopting, in order:</span>'],
+  [7.8,  '  1.  &amp; -&gt; and                 <span class="cy">+4</span>'],
+  [8.2,  '  2.  remove all whitespace     <span class="cy">+1</span>'],
+  [8.6,  ''],
+  [8.9,  '  <span class="dim">sample recoveries:</span>'],
+  [9.3,  '    <span class="gn">ok</span>  Antigua &amp; Barbuda     <span class="dim">-&gt;</span>  Antigua and Barbuda'],
+  [9.8,  '    <span class="gn">ok</span>  Trinidad &amp; Tobago     <span class="dim">-&gt;</span>  Trinidad and Tobago'],
+  [10.3, '    <span class="gn">ok</span>  <span class="yl">Vietnam</span>                 <span class="dim">-&gt;</span>  <span class="yl">Viet Nam</span>'],
+  [11.4, ''],
+  [11.9, '  <span class="dim">A join matching 82% with no errors —</span> <span class="big">quietly dropping Vietnam.</span>'],
+];
+const TYPE_START = 0.45, TYPE_END = 2.55;
+const out = document.getElementById("out");
+window.renderAt = function (t) {
+  let html = "";
+  const frac = Math.max(0, Math.min(1, (t - TYPE_START) / (TYPE_END - TYPE_START)));
+  const n = Math.round(frac * CMD.length);
+  const typed = CMD.slice(0, n);
+  const caret = (t < TYPE_END + 0.15 && Math.floor(t * 2.5) % 2 === 0)
+    ? '<span class="cursor"> </span>' : (t < TYPE_END + 0.15 ? ' ' : '');
+  html += '<div class="l on"><span class="gn">$</span> ' + typed + caret + '</div>';
+  if (t >= 2.9) html += '<div class="l on">&nbsp;</div>';
+  for (const [at, text, cls] of LINES) {
+    const on = t >= at;
+    html += '<div class="l ' + (on ? 'on ' : '') + (cls || '') + '">' + (text || '&nbsp;') + '</div>';
+  }
+  out.innerHTML = html;
+};
+window.renderAt(0);
+window.__ready = true;
+</script>

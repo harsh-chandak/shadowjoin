@@ -2,3 +2,10 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# brag video build artefacts (the rendered assets/ outputs ARE committed)
+brag/frames/
+brag/node_modules/
+brag/palette.png
+brag/package.json
+brag/package-lock.json
