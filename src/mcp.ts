@@ -22,6 +22,8 @@ import type { Report, Row } from "./types.js";
 
 type SourceDef =
   | { type: "postgres"; connectionString: string }
+  | { type: "mysql"; connectionString: string }
+  | { type: "sqlite"; path: string }
   | { type: "csv"; path: string }
   | { type: "json"; path: string };
 
@@ -51,10 +53,18 @@ async function loadSide(side: SideArgs, config: Config, limit: number): Promise<
     throw new Error(`Unknown source "${side.source}". Configured: ${Object.keys(config.sources).join(", ") || "(none)"}`);
   }
   const opts = { keyColumn: side.column, idColumn: side.idColumn, truthColumn: side.truthColumn };
-  if (def.type === "postgres") {
+  if (def.type === "postgres" || def.type === "mysql" || def.type === "sqlite") {
     if (!side.table) throw new Error(`Source "${side.source}" is a database; "table" is required.`);
-    const { rowsFromPostgres } = await import("./adapters/postgres.js");
-    return rowsFromPostgres({ connectionString: def.connectionString, table: side.table, limit, ...opts });
+    if (def.type === "postgres") {
+      const { rowsFromPostgres } = await import("./adapters/postgres.js");
+      return rowsFromPostgres({ connectionString: def.connectionString, table: side.table, limit, ...opts });
+    }
+    if (def.type === "mysql") {
+      const { rowsFromMysql } = await import("./adapters/mysql.js");
+      return rowsFromMysql({ connectionString: def.connectionString, table: side.table, limit, ...opts });
+    }
+    const { rowsFromSqlite } = await import("./adapters/sqlite.js");
+    return rowsFromSqlite({ file: def.path, table: side.table, limit, ...opts });
   }
   return def.type === "json" ? rowsFromJson(def.path, opts) : rowsFromCsv(def.path, opts);
 }

@@ -14,7 +14,9 @@
     "csv",
     "mcp",
     "data-validation",
-    "recall"
+    "recall",
+    "mysql",
+    "sqlite"
   ],
   "license": "MIT",
   "type": "module",
@@ -30,7 +32,9 @@
   "exports": {
     ".": "./dist/index.js",
     "./mcp": "./dist/mcp.js",
-    "./adapters/postgres": "./dist/adapters/postgres.js"
+    "./adapters/postgres": "./dist/adapters/postgres.js",
+    "./adapters/mysql": "./dist/adapters/mysql.js",
+    "./adapters/sqlite": "./dist/adapters/sqlite.js"
   },
   "files": [
     "dist",
@@ -45,6 +49,7 @@
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": ">=1",
+    "mysql2": ">=3",
     "pg": ">=8"
   },
   "peerDependenciesMeta": {
@@ -53,12 +58,16 @@
     },
     "@modelcontextprotocol/sdk": {
       "optional": true
+    },
+    "mysql2": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.23.1",
+    "mysql2": "^3.24.5",
     "typescript": "^5.6.0"
   },
   "repository": {

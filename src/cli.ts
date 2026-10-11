@@ -13,15 +13,15 @@ shadowjoin — measure the matches your exact join is silently dropping.
 
   npx shadowjoin scan --left <src> --left-key <col> --right <src> --right-key <col>
 
-Sources are .csv, .json (array of objects), or a postgres:// connection string
-(which also needs --left-table / --right-table).
+Sources are .csv, .json (array of objects), .db/.sqlite, or a postgres:// or
+mysql:// connection string. Database sources also need --left-table/--right-table.
 
-  --left, --right              file path or postgres:// connection string
+  --left, --right              file path, or postgres:// / mysql:// URL
   --left-key, --right-key      column holding the join key          (required)
   --left-id, --right-id        column holding a stable id
   --left-truth, --right-truth  column holding ground truth; supply it on BOTH
                                sides and every recovery is verified, not guessed
-  --left-table, --right-table  table name (postgres sources only)
+  --left-table, --right-table  table name (database sources only)
 
   --rules <a,b,c>   limit to these rules (default: all; see \`shadowjoin rules\`)
   --samples <n>     example recoveries to print            (default 20)
@@ -44,16 +44,28 @@ async function load(
   if (!keyColumn) throw new Error(`--${kind}-key is required`);
   const opts = { keyColumn, idColumn: v[`${kind}-id`], truthColumn: v[`${kind}-truth`] };
 
+  const table = v[`${kind}-table`];
+  const needsTable = () => {
+    if (!table) throw new Error(`--${kind}-table is required for a database source`);
+    return table;
+  };
+
   if (src.startsWith("postgres://") || src.startsWith("postgresql://")) {
-    const table = v[`${kind}-table`];
-    if (!table) throw new Error(`--${kind}-table is required for a postgres source`);
     const { rowsFromPostgres } = await import("./adapters/postgres.js");
-    return rowsFromPostgres({ connectionString: src, table, limit, ...opts });
+    return rowsFromPostgres({ connectionString: src, table: needsTable(), limit, ...opts });
+  }
+  if (src.startsWith("mysql://")) {
+    const { rowsFromMysql } = await import("./adapters/mysql.js");
+    return rowsFromMysql({ connectionString: src, table: needsTable(), limit, ...opts });
   }
   const ext = extname(src).toLowerCase();
+  if (ext === ".db" || ext === ".sqlite" || ext === ".sqlite3") {
+    const { rowsFromSqlite } = await import("./adapters/sqlite.js");
+    return rowsFromSqlite({ file: src, table: needsTable(), limit, ...opts });
+  }
   if (ext === ".json") return rowsFromJson(src, opts);
   if (ext === ".csv" || ext === ".tsv" || ext === "") return rowsFromCsv(src, opts);
-  throw new Error(`Unsupported source "${src}". Use .csv, .json, or a postgres:// connection string.`);
+  throw new Error(`Unsupported source "${src}". Use .csv, .json, .db/.sqlite, or a postgres:// or mysql:// connection string.`);
 }
 
 async function main(): Promise<number> {

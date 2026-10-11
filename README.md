@@ -177,7 +177,26 @@ npx shadowjoin scan \
 # in CI: fail the build if the floor climbs above 2%
 npx shadowjoin scan --left a.csv --left-key name --right b.csv --right-key name --max-loss 2
 
+# MySQL and SQLite work the same way
+npx shadowjoin scan \
+  --left  'mysql://ro@host/db' --left-table  accounts --left-key  company_name \
+  --right ./reference.sqlite   --right-table vendors  --right-key name
+
 npx shadowjoin rules     # list the normalization rules
+```
+
+**Sources:** CSV, JSON, Postgres, MySQL and SQLite. SQLite uses Node's built-in
+`node:sqlite` (Node 22.5+), so it needs nothing installed; Postgres and MySQL
+need `pg` or `mysql2`, which are optional peers.
+
+**Anything else** works through the library in three lines, because the core
+takes two arrays rather than a connection:
+
+```js
+import { scan } from "shadowjoin";
+const [rows] = await anyDriver.query("SELECT id, company_name FROM accounts");
+const left = rows.map((r) => ({ id: String(r.id), key: r.company_name }));
+scan(left, right);
 ```
 
 ### Library
