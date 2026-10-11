@@ -103,6 +103,27 @@ test("the recommended stack is a usable rules argument", () => {
   assert.equal(rerun.recovered, first.recovered);
 });
 
+test("near misses are reported but never counted in the floor", () => {
+  const r = scan([L("1", "Cape Verde", "CPV")], [L("a", "Cabo Verde", "CPV")]);
+  assert.equal(r.recovered, 0, "no rule explains it, so it must not count");
+  assert.equal(r.lowerBoundLossPct, 0, "the floor must not move on a suggestion");
+  assert.equal(r.nearMisses.length, 1);
+  assert.equal(r.nearMisses[0].verification, "verified");
+  assert.ok(r.nearMisses[0].similarity > 0.5);
+});
+
+test("rows with no string similarity are counted separately, not suggested", () => {
+  const r = scan([L("1", "Vatican City", "VAT")], [L("a", "Holy See", "VAT")]);
+  assert.equal(r.nearMisses.length, 0);
+  assert.equal(r.noCandidate, 1);
+  assert.ok(r.warnings.some((w) => w.includes("alias table")));
+});
+
+test("near-miss detection can be turned off", () => {
+  const r = scan([L("1", "Cape Verde")], [L("a", "Cabo Verde")], { nearMisses: false });
+  assert.equal(r.nearMisses.length, 0);
+});
+
 test("an empty side is reported rather than crashing", () => {
   const r = scan([], [L("a", "Acme")]);
   assert.equal(r.leftRows, 0);

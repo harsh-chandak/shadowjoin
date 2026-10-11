@@ -1,5 +1,6 @@
 import { ALL_RULE_IDS, normalize, rulesByIds } from "./normalize.js";
-import type { Report, Row, Rule, SamplePair, StackStep, Verification } from "./types.js";
+import { TrigramIndex } from "./similarity.js";
+import type { NearMiss, Report, Row, Rule, SamplePair, StackStep, Verification } from "./types.js";
 
 export interface ScanOptions {
   /** Rule ids to enable. Defaults to every rule. */
@@ -8,6 +9,12 @@ export interface ScanOptions {
   maxSamplePairs?: number;
   /** Replace key values in samples with a short hash. Counts are unaffected. */
   redactSamples?: boolean;
+  /** Look for trigram neighbours among rows no rule explains. Default true. */
+  nearMisses?: boolean;
+  /** Minimum Dice score for a near miss. Default 0.45. */
+  nearMissThreshold?: number;
+  /** Cap on near misses reported. Default 25. */
+  maxNearMisses?: number;
 }
 
 /** Tickers, SKUs and ids differ cosmetically across sources; compare them loosely. */
@@ -171,6 +178,31 @@ export function scan(left: Row[], right: Row[], options: ScanOptions = {}): Repo
 
   const recovered = attribution.size;
   const unexplained = missed.length - recovered;
+
+  // 6. The residue. No normalization rule explains these, so look for the
+  //    closest trigram neighbour instead. Reported as advice, never counted:
+  //    a suggestion that has not cleared the rule bar must not move the floor.
+  const nearMisses: NearMiss[] = [];
+  let noCandidate = 0;
+  if (options.nearMisses !== false && unexplained > 0) {
+    const index = new TrigramIndex(right);
+    const maxNear = options.maxNearMisses ?? 25;
+    for (const row of missed) {
+      if (attribution.has(row.id)) continue;
+      const hit = index.best(row.key, { threshold: options.nearMissThreshold ?? 0.45 });
+      if (!hit) { noCandidate++; continue; }
+      if (nearMisses.length < maxNear) {
+        nearMisses.push({
+          leftId: row.id,
+          leftKey: options.redactSamples ? redact(row.key) : row.key,
+          rightId: hit.row.id,
+          rightKey: options.redactSamples ? redact(hit.row.key) : hit.row.key,
+          similarity: hit.similarity,
+          verification: verify(row, [hit.row]),
+        });
+      }
+    }
+  }
   const pct = (n: number) => (left.length === 0 ? 0 : Number(((n / left.length) * 100).toFixed(2)));
 
   if (rules.length > 1) {
@@ -181,6 +213,16 @@ export function scan(left: Row[], right: Row[], options: ScanOptions = {}): Repo
   if (chosen.length > 0 && chosen.length < rules.length && fullStackRecovered < covered.size) {
     warnings.push(
       `Applying every rule recovers ${covered.size - fullStackRecovered} fewer match(es) than the best subset. Over-normalization is costing you matches — rerun with --rules ${chosen.map((r) => r.id).join(",")}`,
+    );
+  }
+  if (nearMisses.length > 0) {
+    warnings.push(
+      `${nearMisses.length} unexplained row(s) have a close trigram neighbour. These are suggestions, NOT counted in the floor — confirm them before adding an alias.`,
+    );
+  }
+  if (noCandidate > 0) {
+    warnings.push(
+      `${noCandidate} unexplained row(s) have no string similarity to anything on the right (e.g. "Vatican City" vs "Holy See"). No normalization rule will ever recover those; they need an alias table.`,
     );
   }
   if (contradicted > 0) {
@@ -220,6 +262,8 @@ export function scan(left: Row[], right: Row[], options: ScanOptions = {}): Repo
         ? null
         : Number(((verified / (verified + contradicted)) * 100).toFixed(2)),
     samplePairs,
+    nearMisses,
+    noCandidate,
     warnings,
     rulesApplied: ruleIds,
   };

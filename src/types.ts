@@ -55,6 +55,23 @@ export interface SamplePair {
   verification: Verification;
 }
 
+/**
+ * A row no rule explains, paired with its closest trigram neighbour.
+ *
+ * Deliberately NOT counted in `recovered` or `lowerBoundLossPct`: these are
+ * unverified suggestions below the confidence bar, and letting them inflate the
+ * headline would turn a defensible floor into a guess.
+ */
+export interface NearMiss {
+  leftId: string;
+  leftKey: string;
+  rightId: string;
+  rightKey: string;
+  /** Sørensen-Dice over character trigrams. 1 is identical. */
+  similarity: number;
+  verification: Verification;
+}
+
 export interface Report {
   generatedAt: string;
   leftRows: number;
@@ -93,6 +110,10 @@ export interface Report {
   precision: number | null;
 
   samplePairs: SamplePair[];
+  /** Closest trigram neighbours for rows no rule explains. Advisory, not counted. */
+  nearMisses: NearMiss[];
+  /** Unexplained rows with no trigram neighbour at all — these need an alias table. */
+  noCandidate: number;
   warnings: string[];
   rulesApplied: string[];
 }

@@ -4,4 +4,5 @@ export { BASE_RULES, OPTIONAL_RULES, ALL_RULE_IDS, normalize, rulesByIds, toSql 
 export { formatReport } from "./format.js";
 export { parseCsv, rowsFromCsv, rowsFromCsvText } from "./adapters/csv.js";
 export type { CsvOptions } from "./adapters/csv.js";
-export type { Report, Row, Rule, RuleContribution, SamplePair, Verification } from "./types.js";
+export { trigrams, dice, TrigramIndex } from "./similarity.js";
+export type { NearMiss, Report, Row, Rule, RuleContribution, SamplePair, StackStep, Verification } from "./types.js";

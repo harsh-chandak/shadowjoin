@@ -52,6 +52,18 @@ export function formatReport(report: Report): string {
     out.push("");
   }
 
+  if (report.nearMisses.length) {
+    out.push("  closest neighbours among rows NO RULE explains (suggestions, not counted):");
+    const mark: Record<string, string> = { verified: "ok ", contradicted: "BAD", ambiguous: "?? ", unverifiable: "   " };
+    for (const nm of report.nearMisses.slice(0, 10)) {
+      out.push(`    ${mark[nm.verification]} ${pad(nm.leftKey, 34)} ~  ${pad(nm.rightKey, 38)} ${nm.similarity}`);
+    }
+    if (report.noCandidate > 0) {
+      out.push(`    ${report.noCandidate} more have no string similarity at all — those need an alias table.`);
+    }
+    out.push("");
+  }
+
   for (const w of report.warnings) out.push(`  ! ${w}`);
   if (report.warnings.length) out.push("");
   return out.join("\n");
