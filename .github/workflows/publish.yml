@@ -1,9 +1,11 @@
 name: publish
 on:
   release: { types: [published] }
+
 permissions:
   contents: read
-  id-token: write          # trusted publishing: the package carries provenance
+  id-token: write          # required: npm exchanges this OIDC token for publish rights
+
 jobs:
   npm:
     runs-on: ubuntu-latest
@@ -13,7 +15,16 @@ jobs:
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
+
+      # Node 22 ships npm 10.x. Trusted publishing (OIDC) needs npm >= 11.5.1,
+      # and without it `npm publish` falls back to looking for a token and fails.
+      - run: npm install -g npm@latest
+      - run: npm --version
+
       - run: npm ci
       - run: npm run build
       - run: npm test
-      - run: npm publish --provenance --access public
+
+      # No NODE_AUTH_TOKEN. Authentication is the OIDC token above, exchanged
+      # for a short-lived credential. Provenance is attached automatically.
+      - run: npm publish --access public
