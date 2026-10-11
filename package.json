@@ -40,7 +40,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
