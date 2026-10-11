@@ -219,6 +219,19 @@ const key = (value) => normalize(value, rules);
 toSql("company_name", rules);                     // the same thing as Postgres SQL
 ```
 
+### Claude Code plugin (easiest)
+
+One command installs the skill and the MCP server together, and prompts for your
+config path:
+
+```bash
+claude plugin marketplace add harsh-chandak/shadowjoin
+claude plugin install shadowjoin@harsh-chandak
+```
+
+Also listed in the [official MCP registry](https://registry.modelcontextprotocol.io)
+as `io.github.harsh-chandak/shadowjoin`.
+
 ### MCP server
 
 Lets an agent measure a join, look at real examples, propose a fix, and then
