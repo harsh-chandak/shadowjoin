@@ -243,7 +243,7 @@ not something it writes.
   "mcpServers": {
     "shadowjoin": {
       "command": "npx",
-      "args": ["-y", "-p", "shadowjoin", "shadowjoin-mcp"],
+      "args": ["-y", "-p", "shadowjoin", "-p", "@modelcontextprotocol/sdk", "shadowjoin-mcp"],
       "env": { "SHADOWJOIN_CONFIG": "/abs/path/to/shadowjoin.config.json" }
     }
   }

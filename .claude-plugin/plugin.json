@@ -1,7 +1,7 @@
 {
   "name": "shadowjoin",
   "displayName": "shadowjoin",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Measure the matches your exact join is silently dropping, and get the normalization rule that recovers each one.",
   "author": {
     "name": "Harsh N. Chandak",
@@ -33,7 +33,7 @@
   "mcpServers": {
     "shadowjoin": {
       "command": "npx",
-      "args": ["-y", "-p", "shadowjoin", "shadowjoin-mcp"],
+      "args": ["-y", "-p", "shadowjoin", "-p", "@modelcontextprotocol/sdk", "shadowjoin-mcp"],
       "env": {
         "SHADOWJOIN_CONFIG": "${user_config.config_path}"
       }

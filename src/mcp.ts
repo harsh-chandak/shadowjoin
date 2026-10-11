@@ -11,14 +11,40 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { createRequire } from "node:module";
 import { scan } from "./scan.js";
 import { ALL_RULE_IDS, OPTIONAL_RULES, rulesByIds, toSql } from "./normalize.js";
 import { rowsFromCsv } from "./adapters/csv.js";
 import { rowsFromJson } from "./adapters/json.js";
 import type { Report, Row } from "./types.js";
+
+const VERSION: string = createRequire(import.meta.url)("../package.json").version;
+
+/**
+ * The SDK is an optional peer, so the core library and CLI stay dependency-free.
+ * Import it dynamically to turn a missing install into an instruction rather
+ * than a module-resolution stack trace, which is what an MCP client shows the
+ * user as nothing more than "Connection closed".
+ */
+async function loadSdk() {
+  try {
+    const [{ Server }, { StdioServerTransport }, types] = await Promise.all([
+      import("@modelcontextprotocol/sdk/server/index.js"),
+      import("@modelcontextprotocol/sdk/server/stdio.js"),
+      import("@modelcontextprotocol/sdk/types.js"),
+    ]);
+    return { Server, StdioServerTransport, ...types };
+  } catch {
+    process.stderr.write(
+      "shadowjoin-mcp needs @modelcontextprotocol/sdk, which is an optional peer dependency.\n" +
+        "Run it with the SDK provided:\n" +
+        "  npx -y -p shadowjoin -p @modelcontextprotocol/sdk shadowjoin-mcp\n" +
+        "or install it alongside shadowjoin:\n" +
+        "  npm i shadowjoin @modelcontextprotocol/sdk\n",
+    );
+    process.exit(1);
+  }
+}
 
 type SourceDef =
   | { type: "postgres"; connectionString: string }
@@ -156,7 +182,9 @@ const TOOLS = [
   },
 ];
 
-const server = new Server({ name: "shadowjoin", version: "0.1.0" }, { capabilities: { tools: {} } });
+const { Server, StdioServerTransport, CallToolRequestSchema, ListToolsRequestSchema } = await loadSdk();
+
+const server = new Server({ name: "shadowjoin", version: VERSION }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 

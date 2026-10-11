@@ -1,6 +1,6 @@
 {
   "name": "shadowjoin",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Measure the matches your exact join is silently dropping. Runs a shadow matcher alongside your real join key and reports a verified floor on lost matches, plus the normalization rule that would recover each one.",
   "keywords": [
     "entity-resolution",
