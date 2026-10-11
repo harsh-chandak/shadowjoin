@@ -1,6 +1,9 @@
 name: publish
 on:
   release: { types: [published] }
+  # Lets a publish be triggered by hand, so validating the trusted-publisher
+  # configuration doesn't require manufacturing a release.
+  workflow_dispatch:
 
 permissions:
   contents: read
