@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.harsh-chandak/shadowjoin",
+  "description": "Measure the matches your exact join is silently dropping, and get the rule that fixes each.",
+  "repository": {
+    "url": "https://github.com/harsh-chandak/shadowjoin",
+    "source": "github"
+  },
+  "version": "0.3.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "shadowjoin",
+      "version": "0.3.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "SHADOWJOIN_CONFIG",
+          "description": "Absolute path to shadowjoin.config.json, which names your data sources. Connection strings live here and never pass through a tool call.",
+          "isRequired": true,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
