@@ -63,10 +63,14 @@ export class TrigramIndex {
     const maxCandidates = options.maxCandidates ?? 200;
 
     const query = trigrams(key);
+    // Skipping near-universal trigrams keeps large indexes fast, but on a small
+    // right-hand side every bucket looks universal and the filter would discard
+    // everything. Only apply it once there are enough rows for it to mean something.
+    const universal = this.rows.length >= 20 ? this.rows.length / 2 : Infinity;
     const overlap = new Map<number, number>();
     for (const gram of query) {
       const bucket = this.postings.get(gram);
-      if (!bucket || bucket.length > this.rows.length / 2) continue; // skip near-universal grams
+      if (!bucket || bucket.length > universal) continue;
       for (const i of bucket) overlap.set(i, (overlap.get(i) ?? 0) + 1);
     }
     if (overlap.size === 0) return null;
