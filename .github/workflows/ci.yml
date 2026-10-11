@@ -1,0 +1,31 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ["20", "22", "24"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ matrix.node }}" }
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: the bundled example must keep reproducing the documented figures
+        run: |
+          node dist/cli.js scan \
+            --left examples/sp500.csv --left-key Security --left-id Symbol --left-truth Symbol \
+            --right examples/listings.json --right-key name --right-id symbol --right-truth symbol \
+            --json > report.json
+          node -e "
+            const r = require('./report.json');
+            const fail = (m) => { console.error('REGRESSION: ' + m); process.exit(1); };
+            if (r.exactMatches !== 1)        fail('exactMatches is ' + r.exactMatches + ', expected 1');
+            if (r.recovered < 420)           fail('recovered fell to ' + r.recovered);
+            if (r.precision < 99)            fail('precision fell to ' + r.precision);
+            console.log('example holds:', r.recovered, 'recovered at', r.precision + '% precision');
+          "

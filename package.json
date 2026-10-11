@@ -1,0 +1,72 @@
+{
+  "name": "shadowjoin",
+  "version": "0.1.0",
+  "description": "Measure the matches your exact join is silently dropping. Runs a shadow matcher alongside your real join key and reports a verified floor on lost matches, plus the normalization rule that would recover each one.",
+  "keywords": [
+    "entity-resolution",
+    "record-linkage",
+    "data-quality",
+    "fuzzy-matching",
+    "deduplication",
+    "pair-completeness",
+    "join",
+    "postgres",
+    "csv",
+    "mcp",
+    "data-validation",
+    "recall"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "shadowjoin": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./mcp": "./dist/mcp.js",
+    "./adapters/postgres": "./dist/adapters/postgres.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "SKILL.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test test/",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": ">=1",
+    "pg": ">=8"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    },
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
+    "typescript": "^5.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harsh-chandak/shadowjoin.git"
+  },
+  "homepage": "https://github.com/harsh-chandak/shadowjoin#readme",
+  "author": "Harsh N. Chandak",
+  "bugs": {
+    "url": "https://github.com/harsh-chandak/shadowjoin/issues"
+  }
+}

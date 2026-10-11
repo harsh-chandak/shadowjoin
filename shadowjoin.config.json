@@ -1,0 +1,6 @@
+{
+  "sources": {
+    "sp500":    { "type": "csv",  "path": "examples/sp500.csv" },
+    "listings": { "type": "json", "path": "examples/listings.json" }
+  }
+}
