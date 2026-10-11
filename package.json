@@ -24,7 +24,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "shadowjoin": "./dist/cli.js"
+    "shadowjoin": "dist/cli.js",
+    "shadowjoin-mcp": "dist/mcp.js"
   },
   "exports": {
     ".": "./dist/index.js",

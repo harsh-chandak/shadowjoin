@@ -147,7 +147,7 @@ not something it writes.
   "mcpServers": {
     "shadowjoin": {
       "command": "npx",
-      "args": ["-y", "shadowjoin/mcp"],
+      "args": ["-y", "-p", "shadowjoin", "shadowjoin-mcp"],
       "env": { "SHADOWJOIN_CONFIG": "/abs/path/to/shadowjoin.config.json" }
     }
   }
