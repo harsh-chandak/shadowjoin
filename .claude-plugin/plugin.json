@@ -1,0 +1,42 @@
+{
+  "name": "shadowjoin",
+  "displayName": "shadowjoin",
+  "version": "0.3.0",
+  "description": "Measure the matches your exact join is silently dropping, and get the normalization rule that recovers each one.",
+  "author": {
+    "name": "Harsh N. Chandak",
+    "url": "https://harsh-chandak.com"
+  },
+  "homepage": "https://github.com/harsh-chandak/shadowjoin",
+  "repository": "https://github.com/harsh-chandak/shadowjoin",
+  "documentationUrl": "https://github.com/harsh-chandak/shadowjoin#readme",
+  "supportUrl": "https://github.com/harsh-chandak/shadowjoin/issues",
+  "license": "MIT",
+  "keywords": [
+    "entity-resolution",
+    "record-linkage",
+    "data-quality",
+    "fuzzy-matching",
+    "deduplication",
+    "postgres",
+    "mysql",
+    "sqlite"
+  ],
+  "userConfig": {
+    "config_path": {
+      "type": "file",
+      "title": "shadowjoin.config.json",
+      "description": "Path to a JSON file naming your data sources. Connection strings live there and never pass through a tool call. See the README for the format.",
+      "required": true
+    }
+  },
+  "mcpServers": {
+    "shadowjoin": {
+      "command": "npx",
+      "args": ["-y", "-p", "shadowjoin", "shadowjoin-mcp"],
+      "env": {
+        "SHADOWJOIN_CONFIG": "${user_config.config_path}"
+      }
+    }
+  }
+}
