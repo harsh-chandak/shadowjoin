@@ -85,6 +85,24 @@ test("the csv parser handles quoted commas and doubled quotes", () => {
   assert.deepEqual(rows[1], ["x, y", 'he said "hi"']);
 });
 
+test("warns when the full rule set recovers fewer than the best subset", () => {
+  // "a b" vs "b a" is recovered by sort-tokens, but adding despace first
+  // collapses both sides differently and loses it.
+  const left = [L("1", "Antigua & Barbuda"), L("2", "x y z"), L("3", "p q")];
+  const right = [L("a", "Antigua and Barbuda"), L("b", "z y x"), L("c", "q p")];
+  const all = scan(left, right);
+  const best = scan(left, right, { rules: all.stack.map((s2) => s2.rule) });
+  assert.ok(best.recovered >= all.recovered, "the greedy subset should never do worse");
+});
+
+test("the recommended stack is a usable rules argument", () => {
+  const left = [L("1", "Acme & Sons"), L("2", "Initech")];
+  const right = [L("a", "Acme and Sons"), L("b", "Initech Corp.")];
+  const first = scan(left, right);
+  const rerun = scan(left, right, { rules: first.stack.map((s2) => s2.rule) });
+  assert.equal(rerun.recovered, first.recovered);
+});
+
 test("an empty side is reported rather than crashing", () => {
   const r = scan([], [L("a", "Acme")]);
   assert.equal(r.leftRows, 0);

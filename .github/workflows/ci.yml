@@ -29,3 +29,15 @@ jobs:
             if (r.precision < 99)            fail('precision fell to ' + r.precision);
             console.log('example holds:', r.recovered, 'recovered at', r.precision + '% precision');
           "
+          node dist/cli.js scan \
+            --left examples/countries_ui.csv --left-key country --left-truth iso3 \
+            --right examples/countries_reference.csv --right-key country --right-truth iso3 \
+            --json > countries.json
+          node -e "
+            const r = require('./countries.json');
+            const fail = (m) => { console.error('REGRESSION: ' + m); process.exit(1); };
+            if (r.exactMatches !== 205) fail('exactMatches is ' + r.exactMatches + ', expected 205');
+            if (r.recovered !== 5)      fail('recovered is ' + r.recovered + ', expected 5');
+            if (r.precision !== 100)    fail('precision fell to ' + r.precision);
+            console.log('countries example holds:', r.recovered, 'recovered at', r.precision + '% precision');
+          "

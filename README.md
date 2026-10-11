@@ -54,6 +54,58 @@ node dist/cli.js scan \
   --right examples/listings.json --right-key name    --right-id symbol --right-truth symbol
 ```
 
+### A join you would actually ship
+
+The example above is deliberately unflattering — a short index name against a
+full security description. Here is the realistic case.
+
+**Unicode CLDR country names** (what your UI displays) joined to **UN official
+country names** (what your reference data uses), on the country name, with ISO
+3166 alpha-3 as ground truth. That is a join people write every week.
+
+```
+  exact join matches              205 / 249   82.33%
+  recovered by shadow join          5          2.01%   precision 100%
+  still unexplained                39
+
+  rules worth adopting:
+  1.  & -> and                 +4
+  2.  remove all whitespace    +1
+```
+
+It looks healthy. 82% matched, no errors, nobody investigating. And it is
+silently dropping `Antigua & Barbuda`, `Trinidad & Tobago`,
+`São Tomé & Príncipe`, `Turks & Caicos Islands` and `Vietnam` — the last one
+because the UN spells it `Viet Nam`.
+
+Two things this example shows that the first one does not:
+
+**Applying every rule finds nothing.** The full rule set recovers zero here; the
+two-rule subset recovers five. Over-normalization collapses keys that should stay
+distinct, and shadowjoin names the better subset instead of letting you assume
+more rules is better.
+
+**It separates mechanical misses from semantic ones.** The 39 it cannot explain
+are not normalization problems at all:
+
+```
+  Vatican City    vs  Holy See
+  North Korea     vs  Democratic People's Republic of Korea
+  Cape Verde      vs  Cabo Verde
+  Bosnia          vs  Bosnia and Herzegovina
+  Hong Kong       vs  China, Hong Kong Special Administrative Region
+```
+
+No string transform recovers those. They need an alias table or a real entity
+resolution library. Knowing *which* of your misses are mechanical and which are
+semantic is the difference between a one-line fix and a project.
+
+```bash
+node dist/cli.js scan \
+  --left  examples/countries_ui.csv        --left-key  country --left-truth  iso3 \
+  --right examples/countries_reference.csv --right-key country --right-truth iso3
+```
+
 > That particular join is deliberately unflattering — a short index name against a
 > full security description. It is a worked example of the *measurement*, not a
 > claim that anyone ships that join. Point it at your own data to get a figure
