@@ -6,7 +6,11 @@ import { formatReport } from "./format.js";
 import { ALL_RULE_IDS, OPTIONAL_RULES } from "./normalize.js";
 import { rowsFromCsv } from "./adapters/csv.js";
 import { rowsFromJson } from "./adapters/json.js";
+import { banner, footer, isTty, Progress } from "./ui.js";
+import { createRequire } from "node:module";
 import type { Row } from "./types.js";
+
+const VERSION: string = createRequire(import.meta.url)("../package.json").version;
 
 const USAGE = `
 shadowjoin — measure the matches your exact join is silently dropping.
@@ -84,7 +88,7 @@ async function main(): Promise<number> {
 
   const command = positionals[0] ?? (values.left ? "scan" : "help");
 
-  if (values.help || command === "help") { console.log(USAGE); return 0; }
+  if (values.help || command === "help") { process.stdout.write(banner(VERSION)); console.log(USAGE); process.stdout.write(footer(VERSION)); return 0; }
 
   if (command === "rules") {
     console.log("\n  Normalization rules (each measured independently against the exact baseline):\n");
@@ -98,18 +102,31 @@ async function main(): Promise<number> {
 
   const v = values as Record<string, string | undefined>;
   const limit = values.limit ? Number(values.limit) : 100_000;
-  const [left, right] = await Promise.all([
-    load(values.left, "left", v, limit),
-    load(values.right, "right", v, limit),
-  ]);
+  const quiet = Boolean(values.json) || !isTty();
+  if (!quiet) process.stdout.write(banner(VERSION));
+
+  const progress = new Progress();
+  if (!quiet) progress.start(`reading ${values.left}`);
+  let left: Row[], right: Row[];
+  try {
+    left = await load(values.left, "left", v, limit);
+    if (!quiet) progress.step(`reading ${values.right}`);
+    right = await load(values.right, "right", v, limit);
+  } catch (err) {
+    progress.abort();
+    throw err;
+  }
 
   const report = scan(left, right, {
+    onPhase: quiet ? undefined : (label) => progress.step(label),
     rules: values.rules ? values.rules.split(",").map((s) => s.trim()).filter(Boolean) : ALL_RULE_IDS,
     maxSamplePairs: values.samples ? Number(values.samples) : 20,
     redactSamples: Boolean(values.redact),
   });
 
+  if (!quiet) progress.stop();
   console.log(values.json ? JSON.stringify(report, null, 2) : formatReport(report));
+  if (!quiet) process.stdout.write(footer(VERSION));
 
   if (values["max-loss"] !== undefined) {
     const threshold = Number(values["max-loss"]);

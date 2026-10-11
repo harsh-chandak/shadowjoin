@@ -11,7 +11,7 @@
          display:flex; align-items:center; padding:0 14px; gap:8px; }
   .dot { width:11px; height:11px; border-radius:50%; }
   .title { color:#6e7681; font-size:12px; margin-left:10px; letter-spacing:.3px; }
-  .body { padding:18px 24px; font-size:16.5px; line-height:1.62; color:#c9d1d9;
+  .body { padding:16px 24px; font-size:15.5px; line-height:1.55; color:#c9d1d9;
           white-space:pre; }
   .l { opacity:0; }
   .l.on { opacity:1; }
@@ -36,31 +36,35 @@
 </div>
 <script>
 const CMD = "npx shadowjoin scan --left countries_ui.csv --right countries_un.csv --key country";
-// Every figure below is verbatim CLI output from:
+// Every line below is verbatim from the real CLI. Reproduce with:
 //   node dist/cli.js scan --left examples/countries_ui.csv --left-key country --left-truth iso3 \
 //     --right examples/countries_reference.csv --right-key country --right-truth iso3
 const LINES = [
-  [3.1,  '<span class="dim">  left rows 249   right rows 249</span>'],
-  [3.4,  ''],
-  [3.7,  '  exact join matches              <span class="big">205</span>   <span class="gn">82.33%</span>   <span class="dim">← looks fine</span>'],
-  [4.6,  '  recovered by shadow join          <span class="big">5</span>   <span class="yl">2.01%</span>'],
-  [5.0,  '  still unexplained                <span class="dim">39</span>'],
-  [5.3,  ''],
-  [5.8,  '  <span class="big">LOWER BOUND ON LOST MATCHES: 2.01% of left rows</span>', 'hl'],
-  [6.6,  '  <span class="dim">verified against ground truth:</span> <span class="gn">5 correct, 0 wrong</span>  <span class="dim">(precision 100%)</span>'],
-  [7.1,  ''],
-  [7.4,  '  <span class="dim">rules worth adopting, in order:</span>'],
-  [7.8,  '  1.  &amp; -&gt; and                 <span class="cy">+4</span>'],
-  [8.2,  '  2.  remove all whitespace     <span class="cy">+1</span>'],
-  [8.6,  ''],
-  [8.9,  '  <span class="dim">sample recoveries:</span>'],
-  [9.3,  '    <span class="gn">ok</span>  Antigua &amp; Barbuda     <span class="dim">-&gt;</span>  Antigua and Barbuda'],
-  [9.8,  '    <span class="gn">ok</span>  Trinidad &amp; Tobago     <span class="dim">-&gt;</span>  Trinidad and Tobago'],
-  [10.3, '    <span class="gn">ok</span>  <span class="yl">Vietnam</span>                 <span class="dim">-&gt;</span>  <span class="yl">Viet Nam</span>'],
-  [11.4, ''],
-  [11.9, '  <span class="dim">A join matching 82% with no errors —</span> <span class="big">quietly dropping Vietnam.</span>'],
+  [2.70, '  <span class="cy">▌</span><span class="big"> shadowjoin </span><span class="dim">v0.2.0</span>'],
+  [2.85, '  <span class="cy">▌</span><span class="dim"> the matches your join never told you it was losing</span>'],
+  [3.05, ''],
+  [3.25, '  <span class="cy">✓</span> <span class="dim">reading countries_ui.csv</span>'],
+  [3.55, '  <span class="cy">✓</span> <span class="dim">reading countries_un.csv</span>'],
+  [3.85, '  <span class="cy">✓</span> <span class="dim">measuring the join as it runs today</span>'],
+  [4.15, '  <span class="cy">✓</span> <span class="dim">testing 8 rules against that baseline</span>'],
+  [4.45, '  <span class="cy">✓</span> <span class="dim">analysing the 39 rows no rule explains</span>  <span class="dim">20ms</span>'],
+  [4.90, ''],
+  [5.20, '  exact join matches              <span class="big">205</span>   <span class="gn">82.33%</span>   <span class="dim">← looks fine</span>'],
+  [5.90, '  recovered by shadow join          <span class="big">5</span>   <span class="yl">2.01%</span>'],
+  [6.30, ''],
+  [6.70, '  <span class="big">LOWER BOUND ON LOST MATCHES: 2.01% of left rows</span>', 'hl'],
+  [7.40, '  <span class="dim">verified against ground truth:</span> <span class="gn">5 correct, 0 wrong</span>  <span class="dim">(precision 100%)</span>'],
+  [7.90, ''],
+  [8.20, '  <span class="dim">rules worth adopting:</span>   1. &amp; -&gt; and <span class="cy">+4</span>   2. remove all whitespace <span class="cy">+1</span>'],
+  [8.90, ''],
+  [9.20, '    <span class="gn">ok</span>  Antigua &amp; Barbuda     <span class="dim">-&gt;</span>  Antigua and Barbuda'],
+  [9.70, '    <span class="gn">ok</span>  <span class="yl">Vietnam</span>                 <span class="dim">-&gt;</span>  <span class="yl">Viet Nam</span>'],
+  [10.60, ''],
+  [11.10, '  <span class="dim">A join matching 82% with no errors —</span> <span class="big">quietly dropping Vietnam.</span>'],
+  [12.30, ''],
+  [12.70, '  <span class="dim">shadowjoin v0.2.0  ·  MIT  ·  Harsh N. Chandak  ·  harsh-chandak.com</span>'],
 ];
-const TYPE_START = 0.45, TYPE_END = 2.55;
+const TYPE_START = 0.40, TYPE_END = 2.40;
 const out = document.getElementById("out");
 window.renderAt = function (t) {
   let html = "";
@@ -70,7 +74,7 @@ window.renderAt = function (t) {
   const caret = (t < TYPE_END + 0.15 && Math.floor(t * 2.5) % 2 === 0)
     ? '<span class="cursor"> </span>' : (t < TYPE_END + 0.15 ? ' ' : '');
   html += '<div class="l on"><span class="gn">$</span> ' + typed + caret + '</div>';
-  if (t >= 2.9) html += '<div class="l on">&nbsp;</div>';
+  if (t >= 2.55) html += '<div class="l on">&nbsp;</div>';
   for (const [at, text, cls] of LINES) {
     const on = t >= at;
     html += '<div class="l ' + (on ? 'on ' : '') + (cls || '') + '">' + (text || '&nbsp;') + '</div>';

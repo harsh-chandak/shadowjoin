@@ -23,6 +23,12 @@ npx shadowjoin scan \
 the committed example below — [higher-resolution
 version](https://github.com/harsh-chandak/shadowjoin/blob/main/assets/brag.mp4).</sub>
 
+The progress output above is real: shadowjoin shows what it is doing while it
+works. All of it is suppressed automatically when stdout is not a terminal, so
+piping to a file, to `jq`, or running in CI produces byte-identical output to
+before — and there is **no postinstall script**, because a tool you point at a
+production database has no business running code at install time.
+
 ## What it found on public data
 
 Joining the **S&P 500 constituent list** against **NYSE + Nasdaq listings** on

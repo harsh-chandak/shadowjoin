@@ -15,6 +15,8 @@ export interface ScanOptions {
   nearMissThreshold?: number;
   /** Cap on near misses reported. Default 25. */
   maxNearMisses?: number;
+  /** Called as each phase begins, so a CLI can show progress. */
+  onPhase?: (label: string) => void;
 }
 
 /** Tickers, SKUs and ids differ cosmetically across sources; compare them loosely. */
@@ -71,7 +73,10 @@ export function scan(left: Row[], right: Row[], options: ScanOptions = {}): Repo
     warnings.push("One side of the join is empty; there is nothing to measure.");
   }
 
+  const phase = options.onPhase ?? (() => {});
+
   // 1. The baseline: the join exactly as it runs today.
+  phase("measuring the join as it runs today");
   const exactIndex = buildIndex(right, null);
   const missed: Row[] = [];
   let exactMatches = 0;
@@ -82,6 +87,7 @@ export function scan(left: Row[], right: Row[], options: ScanOptions = {}): Repo
 
   // 2. Each rule measured independently against that baseline, so the number
   //    beside a rule is what the rule alone buys and not a product of ordering.
+  phase(`testing ${rules.length} rules against that baseline`);
   const attribution = new Map<string, { rule: string; candidates: Row[] }>();
   const byRule = rules.map((rule) => {
     const index = buildIndex(right, [rule]);
@@ -102,6 +108,7 @@ export function scan(left: Row[], right: Row[], options: ScanOptions = {}): Repo
   // 3. Greedy forward selection: which rules, in which order, actually pay.
   //    Most recoveries need a combination, so per-rule figures alone are not
   //    enough to act on.
+  phase("selecting the rules worth adopting");
   const stack: StackStep[] = [];
   const covered = new Set<string>();
   const chosen: Rule[] = [];
@@ -185,6 +192,7 @@ export function scan(left: Row[], right: Row[], options: ScanOptions = {}): Repo
   const nearMisses: NearMiss[] = [];
   let noCandidate = 0;
   if (options.nearMisses !== false && unexplained > 0) {
+    phase(`analysing the ${unexplained} rows no rule explains`);
     const index = new TrigramIndex(right);
     const maxNear = options.maxNearMisses ?? 25;
     for (const row of missed) {
