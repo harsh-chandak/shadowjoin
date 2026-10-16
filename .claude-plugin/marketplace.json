@@ -12,12 +12,15 @@
       "description": "Measure the matches your exact join is silently dropping, and get the rule that recovers each one."
     },
     {
-      "name": "agentguard",
+      "name": "orchestraguard",
       "source": {
         "source": "github",
-        "repo": "harsh-chandak/agentguard"
+        "repo": "harsh-chandak/orchestraguard"
       },
-      "description": "Agents that can't contradict each other."
+      "description": "Agent orchestration never drifts."
     }
-  ]
+  ],
+  "renames": {
+    "agentguard": "orchestraguard"
+  }
 }
