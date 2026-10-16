@@ -10,6 +10,14 @@
       "name": "shadowjoin",
       "source": "./",
       "description": "Measure the matches your exact join is silently dropping, and get the rule that recovers each one."
+    },
+    {
+      "name": "agentguard",
+      "source": {
+        "source": "github",
+        "repo": "harsh-chandak/agentguard"
+      },
+      "description": "Agents that can't contradict each other."
     }
   ]
 }
