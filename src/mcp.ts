@@ -55,7 +55,12 @@ type SourceDef =
 
 interface Config { sources: Record<string, SourceDef> }
 
-const CONFIG_PATH = resolve(process.env.SHADOWJOIN_CONFIG ?? "shadowjoin.config.json");
+// `||`, not `??`: the Claude Code plugin maps this to a user setting, and an
+// unset setting arrives as an empty string rather than as undefined. `??`
+// let "" through, and resolve("") is the working DIRECTORY — so the default
+// install read a directory as its config and told the user to create a file
+// at a path that was already a folder.
+const CONFIG_PATH = resolve(process.env.SHADOWJOIN_CONFIG?.trim() || "shadowjoin.config.json");
 
 async function loadConfig(): Promise<Config> {
   try {
