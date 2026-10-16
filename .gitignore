@@ -13,3 +13,7 @@ brag/package-lock.json
 # Private working notes — launch copy and interview prep. Not for the repo.
 shadowjoin-launch.md
 shadowjoin-interview.md
+
+# build artefact: the plugin directory only accepts text, SVG,
+# PNG/JPEG/GIF/WebP and fonts; other binaries are held for a reviewer
+assets/brag.mp4

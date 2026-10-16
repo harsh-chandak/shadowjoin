@@ -17,11 +17,11 @@ npx shadowjoin scan \
   --right crm_export.csv  --right-key account_name
 ```
 
-[![shadowjoin measuring a country-name join: 205 of 249 matched exactly, which looks fine, while five real matches were being dropped including Vietnam, spelled Viet Nam by the UN](assets/brag.gif)](https://github.com/harsh-chandak/shadowjoin/blob/main/assets/brag.mp4)
+[![shadowjoin measuring a country-name join: 205 of 249 matched exactly, which looks fine, while five real matches were being dropped including Vietnam, spelled Viet Nam by the UN](assets/brag.gif)](https://github.com/harsh-chandak/shadowjoin/blob/main/assets/brag.gif)
 
 <sub>Fourteen seconds, no sound. Every figure in it is verbatim CLI output from
 the committed example below — [higher-resolution
-version](https://github.com/harsh-chandak/shadowjoin/blob/main/assets/brag.mp4).</sub>
+version](https://github.com/harsh-chandak/shadowjoin/blob/main/assets/brag.gif).</sub>
 
 The progress output above is real: shadowjoin shows what it is doing while it
 works. All of it is suppressed automatically when stdout is not a terminal, so

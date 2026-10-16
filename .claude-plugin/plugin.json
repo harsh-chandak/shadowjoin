@@ -33,7 +33,14 @@
   "mcpServers": {
     "shadowjoin": {
       "command": "npx",
-      "args": ["-y", "-p", "shadowjoin", "-p", "@modelcontextprotocol/sdk", "shadowjoin-mcp"],
+      "args": [
+        "-y",
+        "-p",
+        "shadowjoin@0.3.1",
+        "-p",
+        "@modelcontextprotocol/sdk@1.32.1",
+        "shadowjoin-mcp"
+      ],
       "env": {
         "SHADOWJOIN_CONFIG": "${user_config.config_path}"
       }
