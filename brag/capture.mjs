@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const FPS = 20, DUR = 14.0;
+const FPS = 20;
 const outDir = resolve(HERE, "frames");
 
 await rm(outDir, { recursive: true, force: true });
@@ -16,10 +16,12 @@ const browser = await puppeteer.launch({
   args: ["--no-sandbox", "--force-device-scale-factor=1", "--hide-scrollbars", "--disable-lcd-text"],
 });
 const page = await browser.newPage();
-await page.setViewport({ width: 1200, height: 730, deviceScaleFactor: 1 });
+await page.setViewport({ width: 880, height: 600, deviceScaleFactor: 1 });
 await page.goto("file://" + resolve(HERE, "video.html"), { waitUntil: "networkidle0" });
 await page.waitForFunction("window.__ready === true", { timeout: 15000 });
 
+const DUR = await page.evaluate(() => window.__duration);
+console.log(`session runs ${DUR.toFixed(1)}s`);
 const total = Math.round(DUR * FPS);
 for (let i = 0; i < total; i++) {
   await page.evaluate((tt) => window.renderAt(tt), i / FPS);
