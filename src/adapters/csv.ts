@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { DISPLAY_SEPARATOR } from "../keys.js";
 import type { Row } from "../types.js";
 
 /** Minimal RFC-4180 parser: quoted fields, embedded commas, doubled quotes. */
@@ -25,12 +26,23 @@ export function parseCsv(text: string): string[][] {
 }
 
 export interface CsvOptions {
-  /** Column holding the join key. */
-  keyColumn: string;
+  /**
+   * Column holding the join key, or several columns for a composite key —
+   * `(name, city)`, `(sku, vendor)`. Give the same number of columns, in the
+   * same order, on both sides.
+   */
+  keyColumn: string | string[];
   /** Column holding a stable id. Defaults to the row number. */
   idColumn?: string;
   /** Column holding ground truth, if you have one. */
   truthColumn?: string;
+}
+
+/** One or several key columns, as a list. Rejects an empty list outright. */
+export function keyColumns(keyColumn: string | string[]): string[] {
+  const columns = (Array.isArray(keyColumn) ? keyColumn : [keyColumn]).map((c) => c.trim()).filter(Boolean);
+  if (columns.length === 0) throw new Error("No key column was given. Name at least one column to join on.");
+  return columns;
 }
 
 export function rowsFromCsvText(text: string, options: CsvOptions): Row[] {
@@ -42,18 +54,22 @@ export function rowsFromCsvText(text: string, options: CsvOptions): Row[] {
     if (i === -1) throw new Error(`Column "${name}" not found. Columns: ${header.join(", ")}`);
     return i;
   };
-  const k = at(options.keyColumn);
+  const columns = keyColumns(options.keyColumn);
+  const k = columns.map(at);
   const idx = options.idColumn ? at(options.idColumn) : -1;
   const t = options.truthColumn ? at(options.truthColumn) : -1;
 
   const rows: Row[] = [];
   for (let i = 1; i < table.length; i++) {
     const rec = table[i];
-    const key = (rec[k] ?? "").trim();
-    if (!key) continue;
+    const components = k.map((c) => (rec[c] ?? "").trim());
+    // A row missing any part of its key cannot be joined on that key at all,
+    // which is what `WHERE key IS NOT NULL` already does for one column.
+    if (components.some((value) => !value)) continue;
     rows.push({
       id: idx === -1 ? String(i) : (rec[idx] ?? String(i)).trim(),
-      key,
+      key: components.join(DISPLAY_SEPARATOR),
+      ...(components.length > 1 ? { keys: components } : {}),
       ...(t === -1 ? {} : { truth: (rec[t] ?? "").trim() || undefined }),
     });
   }

@@ -1,3 +1,5 @@
+import { DISPLAY_SEPARATOR } from "../keys.js";
+import { keyColumns } from "./csv.js";
 import type { Row } from "../types.js";
 
 export interface PostgresSource {
@@ -5,8 +7,11 @@ export interface PostgresSource {
   connectionString: string;
   /** Table, optionally schema-qualified. */
   table: string;
-  /** Column holding the join key. */
-  keyColumn: string;
+  /**
+   * Column holding the join key, or several for a composite key — `(name, city)`,
+   * `(sku, vendor)`. The same number of columns, in the same order, on both sides.
+   */
+  keyColumn: string | string[];
   idColumn?: string;
   truthColumn?: string;
   /** Row cap. Default 100000. */
@@ -50,7 +55,7 @@ export async function rowsFromPostgres(source: PostgresSource): Promise<Row[]> {
   }
 
   const table = quoteIdent(source.table);
-  const key = quoteIdent(source.keyColumn);
+  const keys = keyColumns(source.keyColumn).map(quoteIdent);
   const id = source.idColumn ? quoteIdent(source.idColumn) : null;
   const truth = source.truthColumn ? quoteIdent(source.truthColumn) : null;
   const limit = Math.max(1, Math.min(source.limit ?? 100_000, 5_000_000));
@@ -79,22 +84,26 @@ export async function rowsFromPostgres(source: PostgresSource): Promise<Row[]> {
     await client.query("SET LOCAL idle_in_transaction_session_timeout = 60000");
 
     const select = [
-      `${key} AS key`,
+      ...keys.map((key, i) => `${key}::text AS key${i}`),
       id ? `${id}::text AS id` : `row_number() OVER ()::text AS id`,
       truth ? `${truth}::text AS truth` : `NULL::text AS truth`,
     ].join(", ");
+    // A row missing any part of its key cannot be joined on that key at all.
+    const present = keys.map((key) => `${key} IS NOT NULL`).join(" AND ");
 
-    const { rows } = await client.query<{ id: string; key: string | null; truth: string | null }>(
-      `SELECT ${select} FROM ${table} WHERE ${key} IS NOT NULL LIMIT ${limit}`,
+    const { rows } = await client.query<Record<string, string | null>>(
+      `SELECT ${select} FROM ${table} WHERE ${present} LIMIT ${limit}`,
     );
     await client.query("COMMIT");
 
     return rows
-      .filter((r) => (r.key ?? "").trim() !== "")
-      .map((r) => ({
-        id: r.id,
-        key: String(r.key).trim(),
-        ...(r.truth ? { truth: r.truth.trim() } : {}),
+      .map((r) => ({ row: r, components: keys.map((_, i) => (r[`key${i}`] ?? "").trim()) }))
+      .filter(({ components }) => components.every((value) => value !== ""))
+      .map(({ row, components }) => ({
+        id: String(row.id),
+        key: components.join(DISPLAY_SEPARATOR),
+        ...(components.length > 1 ? { keys: components } : {}),
+        ...(row.truth ? { truth: row.truth.trim() } : {}),
       }));
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch { /* connection may already be gone */ }

@@ -1,4 +1,4 @@
-import type { Report } from "./types.js";
+import type { PartialPair, Report } from "./types.js";
 
 const pad = (s: string, n: number) => s.length >= n ? s.slice(0, n) : s + " ".repeat(n - s.length);
 const lpad = (s: string, n: number) => s.length >= n ? s : " ".repeat(n - s.length) + s;
@@ -10,6 +10,7 @@ export function formatReport(report: Report): string {
 
   out.push("");
   out.push(`  left rows ${n(report.leftRows)}   right rows ${n(report.rightRows)}`);
+  if (report.keyComponents) out.push(`  join key   ${report.keyComponents.join(" + ")}`);
   out.push("");
   out.push(`  exact join matches        ${lpad(n(report.exactMatches), 9)}   ${report.exactMatchRate}%`);
   out.push(`  recovered by shadow join  ${lpad(n(report.recovered), 9)}   ${report.lowerBoundLossPct}%`);
@@ -38,6 +39,46 @@ export function formatReport(report: Report): string {
     report.stack.forEach((s2, i) => {
       out.push(`  ${pad(String(i + 1) + ".", 4)}${pad(s2.label, 54)}${lpad("+" + n(s2.marginal), 9)}${lpad(n(s2.cumulative), 9)}`);
     });
+    out.push("");
+  }
+
+  if (report.agreement?.length) {
+    const missed = report.leftRows - report.exactMatches;
+    // Ground truth turns a partial bucket into a finding rather than a
+    // curiosity, so show those columns only when there is truth to show.
+    const truth = report.agreement.some((b) => b.verified + b.contradicted + b.ambiguous > 0);
+    out.push(`  which key components agree, among the ${n(missed)} row(s) the exact join missed:`);
+    out.push(`  ${pad("", 4)}${pad("components", 42)}${lpad("rows", 8)}${lpad("cands", 8)}${truth ? lpad("ok", 8) + lpad("wrong", 8) : ""}`);
+    out.push("  " + "-".repeat(76));
+    for (const b of report.agreement) {
+      const label = b.components.length === 0
+        ? "(nothing agrees)"
+        : b.labels.join(" + ") + (b.full ? "  (every component)" : "");
+      out.push(
+        `  ${pad(b.full ? "=" : " ", 4)}${pad(label, 42)}${lpad(n(b.leftRows), 8)}` +
+          `${lpad(b.maxCandidates === 0 ? "" : n(b.maxCandidates), 8)}` +
+          (truth ? `${lpad(n(b.verified), 8)}${lpad(n(b.contradicted), 8)}` : ""),
+      );
+    }
+    out.push('    Only "=" is counted in the floor. The rest agree on part of the key: a');
+    out.push("    dirty column, or a different record — never counted, always worth reading.");
+    out.push('    "cands" is the most right rows one left row agreed with: 1 identifies, many block.');
+    out.push("");
+  }
+
+  if (report.partialPairs?.length) {
+    out.push("  examples of partial agreement (suggestions, NOT counted in the floor):");
+    const mark: Record<string, string> = { verified: "ok ", contradicted: "BAD", ambiguous: "?? ", unverifiable: "   " };
+    const width = Math.max(...report.partialPairs.flatMap((p: PartialPair) => p.components.map((c) => c.label.length)));
+    for (const p of report.partialPairs.slice(0, 6)) {
+      const agree = p.components.filter((c) => c.agrees).map((c) => c.label);
+      const differ = p.components.filter((c) => !c.agrees).map((c) => c.label);
+      const multi = p.candidates > 1 ? `  [${p.candidates} candidates]` : "";
+      out.push(`    ${mark[p.verification]} agrees on ${agree.join(" + ") || "nothing"}, not on ${differ.join(" + ")}${multi}`);
+      for (const c of p.components) {
+        out.push(`          ${pad(c.label, width + 2)}${pad(c.leftValue, 30)}${c.agrees ? "=" : "x"}  ${c.rightValue}`);
+      }
+    }
     out.push("");
   }
 

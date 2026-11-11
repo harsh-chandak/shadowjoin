@@ -76,14 +76,22 @@ async function loadConfig(): Promise<Config> {
   }
 }
 
-interface SideArgs { source: string; table?: string; column: string; truthColumn?: string; idColumn?: string }
+interface SideArgs { source: string; table?: string; column?: string; columns?: string[]; truthColumn?: string; idColumn?: string }
+
+/** The key columns for one side, in order. `columns` wins over `column`. */
+function sideColumns(side: SideArgs): string[] {
+  const given = side.columns !== undefined && side.columns.length > 0 ? side.columns : side.column;
+  const columns = (Array.isArray(given) ? given : [given ?? ""]).map((c) => String(c).trim()).filter(Boolean);
+  if (columns.length === 0) throw new Error(`Source "${side.source}" needs a "column", or "columns" for a composite key.`);
+  return columns;
+}
 
 async function loadSide(side: SideArgs, config: Config, limit: number): Promise<Row[]> {
   const def = config.sources[side.source];
   if (!def) {
     throw new Error(`Unknown source "${side.source}". Configured: ${Object.keys(config.sources).join(", ") || "(none)"}`);
   }
-  const opts = { keyColumn: side.column, idColumn: side.idColumn, truthColumn: side.truthColumn };
+  const opts = { keyColumn: sideColumns(side), idColumn: side.idColumn, truthColumn: side.truthColumn };
   if (def.type === "postgres" || def.type === "mysql" || def.type === "sqlite") {
     if (!side.table) throw new Error(`Source "${side.source}" is a database; "table" is required.`);
     if (def.type === "postgres") {
@@ -120,6 +128,14 @@ function summarize(runId: string, report: Report) {
     topRules: report.stack.slice(0, 5).map((s) => ({ rule: s.rule, marginal: s.marginal })),
     warnings: report.warnings,
     note: "lowerBoundLossPct is a FLOOR, not an estimate: the shadow matcher's own recall is unknown, so the true loss is at least this large. Call explain_misses and show the user real pairs before acting on it.",
+    ...(report.keyComponents === undefined
+      ? {}
+      : {
+          keyComponents: report.keyComponents,
+          agreement: report.agreement,
+          agreementNote:
+            "agreement partitions the missed rows by WHICH key components match. Only the bucket with full:true is counted in lowerBoundLossPct. A partial bucket with a high `verified` count means that component is dirty, not that the row is absent — report it as a separate finding, never as part of the floor.",
+        }),
   };
 }
 
@@ -128,18 +144,25 @@ const SIDE_SCHEMA = {
   properties: {
     source: { type: "string", description: "Name of a source from shadowjoin.config.json. Not a connection string." },
     table: { type: "string", description: "Table name (database sources only). Plain identifier; arbitrary SQL is rejected." },
-    column: { type: "string", description: "Column holding the join key." },
+    column: { type: "string", description: "Column holding the join key. Use `columns` instead for a composite key." },
+    columns: {
+      type: "array",
+      items: { type: "string" },
+      description: "Columns of a composite join key, in order — e.g. [\"name\",\"city\"]. Both sides need the same number, in the same order. Wins over `column`.",
+    },
     idColumn: { type: "string", description: "Column holding a stable row id." },
     truthColumn: { type: "string", description: "Column holding ground truth. Supply on BOTH sides to get verified precision." },
   },
-  required: ["source", "column"],
+  required: ["source"],
+  // One of the two, as before — just no longer only `column`.
+  anyOf: [{ required: ["column"] }, { required: ["columns"] }],
 } as const;
 
 const TOOLS = [
   {
     name: "scan_join",
     description:
-      "Measure how many matches an exact join is silently dropping. Returns a compact summary including a FLOOR on lost matches and the rules worth adopting. Read-only. Call this before changing matching logic, and again after, to prove the change helped.",
+      "Measure how many matches an exact join is silently dropping. Returns a compact summary including a FLOOR on lost matches and the rules worth adopting. Joins on one column per side, or several via `columns`, which also reports which key components agree. Read-only. Call this before changing matching logic, and again after, to prove the change helped.",
     inputSchema: {
       type: "object",
       properties: {
@@ -171,7 +194,13 @@ const TOOLS = [
       "Turn a scan into a concrete fix: the rules worth adopting in order, each as a Postgres expression and a JavaScript function ready to paste into the matching pipeline.",
     inputSchema: {
       type: "object",
-      properties: { runId: { type: "string" }, column: { type: "string", description: "Column name to build the SQL around. Default 'key'." } },
+      properties: {
+        runId: { type: "string" },
+        column: {
+          type: "string",
+          description: "Column name to build the SQL around. Defaults to 'key' for a single-column join, and to the key's own columns for a composite one.",
+        },
+      },
       required: ["runId"],
     },
   },
@@ -206,9 +235,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         loadSide(args.left as SideArgs, config, limit),
         loadSide(args.right as SideArgs, config, limit),
       ]);
+      const leftColumns = sideColumns(args.left as SideArgs);
+      const rightColumns = sideColumns(args.right as SideArgs);
       const report = scan(left, right, {
         rules: Array.isArray(args.rules) && args.rules.length ? args.rules : ALL_RULE_IDS,
         maxSamplePairs: 50,
+        ...(leftColumns.length > 1
+          ? { keyLabels: leftColumns.map((c, i) => (rightColumns[i] && rightColumns[i] !== c ? `${c} / ${rightColumns[i]}` : c)) }
+          : {}),
       });
       const runId = randomUUID().slice(0, 8);
       runs.set(runId, { report, left: args.left, right: args.right });
@@ -225,6 +259,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return ok({
         runId: args.runId,
         pairs,
+        ...(run.report.partialPairs === undefined
+          ? {}
+          : {
+              partialPairs: run.report.partialPairs.slice(0, limit),
+              partialNote:
+                "partialPairs agree on some key components and not others. They are NOT part of the floor. Show them as evidence about a specific dirty column.",
+            }),
         legend: {
           verified: "ground truth confirms this pair",
           contradicted: "ground truth says this pair is WRONG — the matcher over-merged",
@@ -237,21 +278,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === "suggest_normalization") {
       const run = runs.get(String(args.runId));
       if (!run) throw new Error(`Unknown runId "${args.runId}". Call scan_join first.`);
-      const column = typeof args.column === "string" ? args.column : "key";
+      // One expression per key column: a composite key needs the normalization
+      // applied to every component, not just the first. Its columns come from
+      // the run itself rather than from `keyComponents`, which holds display
+      // labels that may name both sides and are not valid SQL.
+      const columns = typeof args.column === "string"
+        ? [args.column]
+        : run.report.keyComponents === undefined ? ["key"] : sideColumns(run.left);
       const chosen = run.report.stack.map((s) => s.rule);
       const steps = run.report.stack.map((step, i) => {
         const upto = rulesByIds(chosen.slice(0, i + 1));
-        return { ...step, sql: toSql(column, upto) };
+        return { ...step, sql: columns.map((c) => toSql(c, upto)).join(", ") };
       });
       return ok({
         runId: args.runId,
         recommended: chosen,
+        keyColumns: columns,
         steps,
-        fullSql: toSql(column, rulesByIds(chosen)),
+        fullSql: columns.map((c) => toSql(c, rulesByIds(chosen))).join(", "),
+        ...(columns.length > 1
+          ? {
+              sqlByColumn: columns.map((c) => ({ column: c, sql: toSql(c, rulesByIds(chosen)) })),
+              compositeNote:
+                "A composite key needs every component normalized, and the join must still compare all of them: equality on one component is not a match. Apply one expression per column.",
+            }
+          : {}),
         javascript:
           "import { normalize, rulesByIds } from 'shadowjoin';\n" +
           `const rules = rulesByIds(${JSON.stringify(chosen)});\n` +
-          "const key = (value) => normalize(value, rules);",
+          (columns.length > 1
+            ? "const key = (...values) => values.map((value) => normalize(value, rules));"
+            : "const key = (value) => normalize(value, rules);"),
         caution:
           "Adopting a rule widens matching and can merge records that should stay separate. Re-run scan_join afterwards and compare_runs to confirm precision did not fall.",
       });

@@ -5,4 +5,7 @@ export { formatReport } from "./format.js";
 export { parseCsv, rowsFromCsv, rowsFromCsvText } from "./adapters/csv.js";
 export type { CsvOptions } from "./adapters/csv.js";
 export { trigrams, dice, TrigramIndex } from "./similarity.js";
-export type { NearMiss, Report, Row, Rule, RuleContribution, SamplePair, StackStep, Verification } from "./types.js";
+export type {
+  AgreementBucket, ComponentAgreement, CompositeRow, NearMiss, PartialPair, Report, Row, Rule,
+  RuleContribution, SamplePair, ScanRow, StackStep, Verification,
+} from "./types.js";

@@ -49,8 +49,51 @@ test("sqlite adapter rejects anything that is not a plain identifier", { skip: !
     () => rowsFromSqlite({ file: DB, table: "ui", keyColumn: "country) FROM ui--" }),
     /Refusing identifier/,
   );
+  await assert.rejects(
+    () => rowsFromSqlite({ file: DB, table: "ui", keyColumn: ["country", "iso3) FROM ui--"] }),
+    /Refusing identifier/,
+    "every component of a composite key is checked, not just the first",
+  );
 });
 
+test("sqlite adapter reads a composite key from several columns", { skip: !DatabaseSync && "needs Node >= 22.5 for node:sqlite" }, async () => {
+  const { rowsFromSqlite } = await import("../dist/adapters/sqlite.js");
+  const opts = { file: DB, keyColumn: ["country", "iso3"] };
+  const left  = await rowsFromSqlite({ ...opts, table: "ui" });
+  const right = await rowsFromSqlite({ ...opts, table: "un" });
+  assert.deepEqual(left[0].keys, ["Antigua & Barbuda", "ATG"]);
+
+  const r = scan(left, right, { keyLabels: ["country", "iso3"] });
+  assert.equal(r.exactMatches, 1);          // Albania, on both components
+  assert.equal(r.recovered, 2);             // Antigua & Barbuda, Vietnam
+  assert.deepEqual(r.keyComponents, ["country", "iso3"]);
+  assert.equal(r.agreement.find((b) => b.full).leftRows, 2);
+});
+
+// The identifier guard runs before any connection is opened, so this needs no
+// MySQL server — which is why it is NOT gated like the two integration tests
+// below it. Without it, the mysql adapter's guard had no coverage at all.
+test("mysql adapter rejects anything that is not a plain identifier, without connecting", async () => {
+  const { rowsFromMysql } = await import("../dist/adapters/mysql.js");
+  const unreachable = "mysql://nobody@127.0.0.1:1/none";
+  await assert.rejects(
+    () => rowsFromMysql({ connectionString: unreachable, table: "ui; DROP TABLE ui", keyColumn: "country" }),
+    /Refusing identifier/,
+  );
+  await assert.rejects(
+    () => rowsFromMysql({ connectionString: unreachable, table: "ui", keyColumn: "country) FROM ui--" }),
+    /Refusing identifier/,
+  );
+  await assert.rejects(
+    () => rowsFromMysql({ connectionString: unreachable, table: "ui", keyColumn: ["country", "iso3) FROM ui--"] }),
+    /Refusing identifier/,
+    "every component of a composite key is checked, not just the first",
+  );
+});
+
+// SKIPPED BY DESIGN: these two need a live MySQL server, and they CREATE and
+// DROP tables on it. Opt in with SHADOWJOIN_TEST_MYSQL; `npm test` must not
+// require a database daemon.
 const MYSQL_URL = process.env.SHADOWJOIN_TEST_MYSQL;
 
 test("mysql adapter reads a table and the scan matches the CSV path", { skip: !MYSQL_URL && "set SHADOWJOIN_TEST_MYSQL to run" }, async () => {

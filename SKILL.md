@@ -34,6 +34,17 @@ whether a fix worked.
 being lost", never "23% of matches are lost". The shadow matcher's own recall is
 unknown, so the true figure can only be larger.
 
+**Partial agreement is not loss.** With a composite key — `columns: ["name","city"]`
+— the report adds `agreement`: the missed rows grouped by which components match.
+Only the bucket with `full: true` is in the floor. A row that agrees on the name
+and not the city is evidence about a dirty column, and you report it as that:
+"39 rows match on the code but not the name" is a finding, "39 lost matches" is a
+claim the tool did not make. Read the bucket's `verified` and `contradicted`
+counts before calling a partial bucket a loss — a shared name is not a shared
+record — and its `maxCandidates`: 1 means those components identify a row, a
+large number means they only block, and narrowing the key to them would be bad
+advice.
+
 **Never claim an improvement without `compare_runs`.** If you changed matching
 logic and `exactMatchRate` did not move, your change did not take effect — say
 that plainly rather than reporting success.

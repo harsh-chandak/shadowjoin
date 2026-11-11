@@ -123,6 +123,66 @@ node dist/cli.js scan \
 > claim that anyone ships that join. Point it at your own data to get a figure
 > that means something about you.
 
+### A join on more than one column
+
+Real joins are rarely one column. They are `(name, city)`, `(sku, vendor)`,
+`(country, code)` — and the most useful thing a join like that can tell you is
+which *part* of the key disagreed. Comma-separate the columns:
+
+```bash
+node dist/cli.js scan \
+  --left  examples/countries_ui.csv        --left-key  country,iso3 \
+  --right examples/countries_reference.csv --right-key country,iso3
+```
+
+```
+  left rows 249   right rows 249
+  join key   country + iso3
+
+  exact join matches              205   82.33%
+  recovered by shadow join          5   2.01%
+  still unexplained                39
+
+  which key components agree, among the 44 row(s) the exact join missed:
+      components                                    rows   cands
+  ----------------------------------------------------------------------------
+  =   country + iso3  (every component)                5       1
+      iso3                                            39       1
+    Only "=" is counted in the floor. The rest agree on part of the key: a
+    dirty column, or a different record — never counted, always worth reading.
+    "cands" is the most right rows one left row agreed with: 1 identifies, many block.
+
+  examples of partial agreement (suggestions, NOT counted in the floor):
+        agrees on iso3, not on country
+          country  Bolivia                       x  Bolivia (Plurinational State of)
+          iso3     BOL                           =  BOL
+```
+
+Thirty-nine rows where the ISO code agrees and the country name does not. That
+is neither a normalization problem nor a missing record: it is one column
+carrying the join while the other vetoes it. Add a column to a join "to be
+safe" and this is what it costs you — and an exact join reports all forty-four
+misses as the same silence.
+
+**Partial agreement is never counted in the floor.** Only rows where *every*
+component agrees are counted — the `=` line. Agreeing on a name is not evidence
+that two cities are the same place, and a bound that counted maybes would not be
+a bound. So partial agreement is reported beside the floor, never inside it.
+
+Two things make a partial bucket readable rather than suggestive:
+
+- **`cands`** — the most right rows that agreed with any single left row. `1`
+  means those components identify a row on their own, so a key of just them is
+  worth measuring, and shadowjoin says so. A large number means they *block*
+  rather than identify — half the table shares a city — and those rows are
+  candidate sets, not pairs. shadowjoin will not suggest narrowing to them.
+- **ground truth** — supply a `truth` column on both sides and every bucket
+  gains its own `ok` and `wrong` counts. On a partial bucket, `ok` means those
+  rows really are the same entity, so the disagreeing column is dirty and the
+  loss is real; `wrong` means they are different records that happen to share a
+  component. Two buckets of identical size can mean opposite things, and the
+  count alone cannot tell them apart.
+
 ## The number is a floor, not an estimate
 
 You cannot compute recall without labels. The entity-resolution literature calls
@@ -180,6 +240,11 @@ npx shadowjoin scan \
   --left  'postgres://ro@host/db' --left-table  orders    --left-key  customer_name \
   --right 'postgres://ro@host/db' --right-table customers --right-key name
 
+# a composite key: comma-separate the columns, same order on both sides
+npx shadowjoin scan \
+  --left  orders.csv    --left-key  customer_name,city \
+  --right customers.csv --right-key name,town
+
 # in CI: fail the build if the floor climbs above 2%
 npx shadowjoin scan --left a.csv --left-key name --right b.csv --right-key name --max-loss 2
 
@@ -212,6 +277,15 @@ import { scan, normalize, rulesByIds, toSql } from "shadowjoin";
 
 const report = scan(leftRows, rightRows);        // rows are { id, key, truth? }
 console.log(report.lowerBoundLossPct, report.stack);
+
+// a composite key: give each row `keys` instead of `key`, in column order
+const composite = scan(
+  [{ id: "1", keys: ["Acme", "Boston"] }],
+  [{ id: "a", keys: ["Acme Inc.", "Boston"] }],
+  { keyLabels: ["name", "city"] },
+);
+composite.agreement;    // the missed rows, grouped by WHICH components agree
+composite.partialPairs; // examples, component by component. Never counted.
 
 // adopt the recommended rules in your own pipeline
 const rules = rulesByIds(report.stack.map((s) => s.rule));
@@ -260,6 +334,9 @@ not something it writes.
 ```
 
 Tools: `scan_join`, `explain_misses`, `suggest_normalization`, `compare_runs`.
+Pass `columns: ["name","city"]` instead of `column` on either side to join on a
+composite key; the summary then carries the `agreement` breakdown as well as the
+floor.
 
 **Two things this MCP server deliberately does not have:**
 
@@ -299,6 +376,11 @@ Read these before quoting a number from it.
   by ground truth and 8 were ambiguous — mostly share classes, where stripping
   "Class A" merges genuinely different securities. Ambiguous matches need a
   tie-breaker, not a normalization rule. Always read `samplePairs`.
+- **Partial agreement is not part of the floor.** With a composite key, rows
+  agreeing on some components and not others are reported separately and never
+  counted. They are the most useful output the tool has, and also the easiest to
+  over-read: a shared name is not a shared record. Check the `verified` count on
+  the bucket, and read `partialPairs`, before calling any of them a loss.
 - **Per-rule counts overlap and will not sum to the total.** Each is measured
   independently against the exact baseline, deliberately, so the numbers are not
   an artifact of the order rules happen to run in. Use `stack` — the greedy

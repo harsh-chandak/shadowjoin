@@ -22,6 +22,8 @@ mysql:// connection string. Database sources also need --left-table/--right-tabl
 
   --left, --right              file path, or postgres:// / mysql:// URL
   --left-key, --right-key      column holding the join key          (required)
+                               comma-separate for a composite key, e.g.
+                               --left-key name,city --right-key name,city
   --left-id, --right-id        column holding a stable id
   --left-truth, --right-truth  column holding ground truth; supply it on BOTH
                                sides and every recovery is verified, not guessed
@@ -38,14 +40,22 @@ mysql:// connection string. Database sources also need --left-table/--right-tabl
 
 The figure it reports is a FLOOR. The shadow matcher's own recall is unknown,
 so the true loss is at least this large and may be larger.
+
+With a composite key it also reports PARTIAL agreement — which components match
+and which do not. Only rows where every component agrees count towards the floor.
 `;
+
+/** Split `--left-key name,city` into its columns. One column stays one column. */
+function keyColumnsOf(value: string | undefined): string[] {
+  return (value ?? "").split(",").map((c) => c.trim()).filter(Boolean);
+}
 
 async function load(
   src: string, kind: "left" | "right",
   v: Record<string, string | undefined>, limit: number,
 ): Promise<Row[]> {
-  const keyColumn = v[`${kind}-key`];
-  if (!keyColumn) throw new Error(`--${kind}-key is required`);
+  const keyColumn = keyColumnsOf(v[`${kind}-key`]);
+  if (keyColumn.length === 0) throw new Error(`--${kind}-key is required`);
   const opts = { keyColumn, idColumn: v[`${kind}-id`], truthColumn: v[`${kind}-truth`] };
 
   const table = v[`${kind}-table`];
@@ -117,8 +127,17 @@ async function main(): Promise<number> {
     throw err;
   }
 
+  // Label the components with the column names, naming both sides when they
+  // differ: "company_name / account_name" says more than "key 1".
+  const leftColumns = keyColumnsOf(values["left-key"]);
+  const rightColumns = keyColumnsOf(values["right-key"]);
+  const keyLabels = leftColumns.length > 1
+    ? leftColumns.map((c, i) => (rightColumns[i] && rightColumns[i] !== c ? `${c} / ${rightColumns[i]}` : c))
+    : undefined;
+
   const report = scan(left, right, {
     onPhase: quiet ? undefined : (label) => progress.step(label),
+    ...(keyLabels ? { keyLabels } : {}),
     rules: values.rules ? values.rules.split(",").map((s) => s.trim()).filter(Boolean) : ALL_RULE_IDS,
     maxSamplePairs: values.samples ? Number(values.samples) : 20,
     redactSamples: Boolean(values.redact),

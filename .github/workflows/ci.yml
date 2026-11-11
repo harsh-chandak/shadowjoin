@@ -41,6 +41,24 @@ jobs:
             if (r.precision !== 100)    fail('precision fell to ' + r.precision);
             console.log('countries example holds:', r.recovered, 'recovered at', r.precision + '% precision');
           "
+          node dist/cli.js scan \
+            --left examples/countries_ui.csv --left-key country,iso3 \
+            --right examples/countries_reference.csv --right-key country,iso3 \
+            --json > composite.json
+          node -e "
+            const r = require('./composite.json');
+            const fail = (m) => { console.error('REGRESSION: ' + m); process.exit(1); };
+            if (r.exactMatches !== 205) fail('exactMatches is ' + r.exactMatches + ', expected 205');
+            if (r.recovered !== 5)      fail('recovered is ' + r.recovered + ', expected 5');
+            const missed = r.leftRows - r.exactMatches;
+            const summed = r.agreement.reduce((n, b) => n + b.leftRows, 0);
+            if (summed !== missed)      fail('agreement sums to ' + summed + ', expected ' + missed);
+            const full = r.agreement.filter((b) => b.full);
+            if (full.length !== 1 || full[0].leftRows !== r.recovered) fail('the full bucket is not the floor');
+            const iso = r.agreement.find((b) => !b.full && b.labels.join() === 'iso3');
+            if (!iso || iso.leftRows !== 39) fail('partial agreement on iso3 is ' + (iso && iso.leftRows) + ', expected 39');
+            console.log('composite example holds:', r.recovered, 'counted,', iso.leftRows, 'partial');
+          "
 
   mysql:
     runs-on: ubuntu-latest
