@@ -299,7 +299,7 @@ One command installs the skill and the MCP server together, and prompts for your
 config path:
 
 ```bash
-claude plugin marketplace add harsh-chandak/shadowjoin
+claude plugin marketplace add harsh-chandak/harsh-chandak
 claude plugin install shadowjoin@harsh-chandak
 ```
 
