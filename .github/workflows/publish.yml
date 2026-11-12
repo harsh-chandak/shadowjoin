@@ -25,7 +25,11 @@ jobs:
 
       # Node 22 ships npm 10.x. Trusted publishing (OIDC) needs npm >= 11.5.1,
       # and without it `npm publish` falls back to looking for a token and fails.
-      - run: npm install -g npm@latest
+      # Pinned, and installed without lifecycle scripts. 12.2.2 is the version the
+      # 0.4.0 release published under, so this pins a proven one rather than
+      # whatever `latest` resolves to on the day. npm itself declares no
+      # install/prepare scripts, so --ignore-scripts costs nothing here.
+      - run: npm install -g --ignore-scripts npm@12.2.2
       - run: npm --version
 
       - run: npm ci
@@ -78,7 +82,11 @@ jobs:
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
-      - run: npm install -g npm@latest
+      # Pinned, and installed without lifecycle scripts. 12.2.2 is the version the
+      # 0.4.0 release published under, so this pins a proven one rather than
+      # whatever `latest` resolves to on the day. npm itself declares no
+      # install/prepare scripts, so --ignore-scripts costs nothing here.
+      - run: npm install -g --ignore-scripts npm@12.2.2
 
       - name: is this version already on npm?
         id: served
