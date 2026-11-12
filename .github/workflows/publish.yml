@@ -5,13 +5,17 @@ on:
   # configuration doesn't require manufacturing a release.
   workflow_dispatch:
 
+# Deliberately read-only at the workflow level: id-token: write is granted
+# per job, to the two that actually exchange it.
 permissions:
   contents: read
-  id-token: write          # required: npm exchanges this OIDC token for publish rights
 
 jobs:
   npm:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write      # npm exchanges this OIDC token for publish rights
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,7 +43,7 @@ jobs:
           set -euo pipefail
           PKG="$(jq -r .name package.json)"
           VER="$(jq -r .version package.json)"
-          if curl -fsSL "https://registry.npmjs.org/${PKG}" | jq -e --arg v "$VER" '.versions[$v]' >/dev/null 2>&1; then
+          if curl -fsSL --proto '=https' --proto-redir '=https' "https://registry.npmjs.org/${PKG}" | jq -e --arg v "$VER" '.versions[$v]' >/dev/null 2>&1; then
             echo "already=true" >> "$GITHUB_OUTPUT"
             echo "npm already serves ${PKG}@${VER} — skipping publish, continuing to the registry"
           else
@@ -71,11 +75,11 @@ jobs:
           # lives only in the tag — so resolve the tag and keep the asset name
           # fixed. Download, verify, then extract: never pipe a download into a
           # program, because a piped download runs whatever arrives.
-          TAG="$(curl -fsSL https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | jq -r .tag_name)"
+          TAG="$(curl -fsSL --proto '=https' --proto-redir '=https' https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | jq -r .tag_name)"
           VER="${TAG#v}"
           BASE="https://github.com/modelcontextprotocol/registry/releases/download/${TAG}"
-          curl -fsSL -o mcp-publisher_linux_amd64.tar.gz "${BASE}/mcp-publisher_linux_amd64.tar.gz"
-          curl -fsSL -o checksums.txt "${BASE}/registry_${VER}_checksums.txt"
+          curl -fsSL --proto '=https' --proto-redir '=https' -o mcp-publisher_linux_amd64.tar.gz "${BASE}/mcp-publisher_linux_amd64.tar.gz"
+          curl -fsSL --proto '=https' --proto-redir '=https' -o checksums.txt "${BASE}/registry_${VER}_checksums.txt"
           grep " mcp-publisher_linux_amd64.tar.gz$" checksums.txt | sha256sum --check --status
           echo "checksum verified"
           tar xzf mcp-publisher_linux_amd64.tar.gz mcp-publisher
@@ -104,7 +108,7 @@ jobs:
           PKG="$(jq -r '.packages[0].identifier' server.json)"
           VER="$(jq -r '.packages[0].version' server.json)"
           for i in $(seq 1 30); do
-            if curl -fsSL "https://registry.npmjs.org/${PKG}" | jq -e --arg v "$VER" '.versions[$v]' >/dev/null 2>&1; then
+            if curl -fsSL --proto '=https' --proto-redir '=https' "https://registry.npmjs.org/${PKG}" | jq -e --arg v "$VER" '.versions[$v]' >/dev/null 2>&1; then
               echo "npm serves ${PKG}@${VER} after $((i * 10))s"
               exit 0
             fi
