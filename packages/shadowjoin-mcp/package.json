@@ -1,0 +1,36 @@
+{
+  "name": "shadowjoin-mcp",
+  "version": "0.4.0",
+  "description": "The shadowjoin MCP server, launchable as `npx shadowjoin-mcp` with no extra arguments.",
+  "type": "module",
+  "bin": {
+    "shadowjoin-mcp": "bin.mjs"
+  },
+  "dependencies": {
+    "shadowjoin": "0.4.0",
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  },
+  "files": [
+    "bin.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "shadowjoin",
+    "join",
+    "entity-resolution"
+  ],
+  "license": "MIT",
+  "author": "Harsh N. Chandak",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harsh-chandak/shadowjoin.git",
+    "directory": "packages/shadowjoin-mcp"
+  },
+  "homepage": "https://github.com/harsh-chandak/shadowjoin#readme",
+  "engines": {
+    "node": ">=20"
+  }
+}

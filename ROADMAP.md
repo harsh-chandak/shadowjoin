@@ -29,13 +29,21 @@ that becomes answerable: how much of the real loss does the floor actually
 capture? If the answer is "most of it," that is a publishable result and the
 strongest single claim this project could make.
 
-## 3. Composite keys
+## 3. Composite keys — shipped in 0.4.0
 
 One column per side was a scoping decision. Real joins are `(name, city)` or
 `(sku, vendor)`, and partial agreement — name matches, city doesn't — is the most
 useful signal available.
 
 **Fixes:** the most likely reason someone tries it and stops.
+
+Shipped: `--left-key name,city` on the CLI, `columns` over MCP, and all five
+adapters. Only rows where every component agrees count towards `recovered`;
+partial agreement is reported beside the floor, never inside it. Tuples are
+length-prefixed before indexing so `("ab","c")` cannot collide with
+`("a","bc")`, and a component that normalizes to empty is not evidence of
+agreement. Partial buckets carry `maxCandidates`, so a key that only *blocks*
+is reported as such instead of recommended.
 
 ## 4. Learned rules
 
