@@ -303,6 +303,27 @@ claude plugin marketplace add harsh-chandak/shadowjoin
 claude plugin install shadowjoin@harsh-chandak
 ```
 
+### Any other MCP client
+
+Codex, Copilot, Cursor, Zed and anything else that speaks the protocol take a
+stdio server rather than a Claude Code plugin:
+
+```json
+{
+  "mcpServers": {
+    "shadowjoin": {
+      "command": "npx",
+      "args": ["-y", "-p", "shadowjoin", "-p", "@modelcontextprotocol/sdk", "shadowjoin-mcp"]
+    }
+  }
+}
+```
+
+Nothing is installed up front; npx fetches both on first run. The second `-p`
+is not optional — the SDK is a peer dependency, not a runtime one, so this
+package stays dependency-free for anyone who only wants the CLI. Add `-p pg` or
+`-p mysql2` if you will scan a database.
+
 Also listed in the [official MCP registry](https://registry.modelcontextprotocol.io)
 as `io.github.harsh-chandak/shadowjoin`.
 
