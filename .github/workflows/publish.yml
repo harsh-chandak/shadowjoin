@@ -28,6 +28,90 @@ jobs:
       - run: npm run build
       - run: npm test
 
+      # npm refuses to republish a version, so without this check a re-run
+      # fails here and the registry job below — which may be the only reason
+      # for the re-run — never gets to execute. That is exactly how a release
+      # half-lands: npm served the version and the registry still advertised
+      # the old one.
+      - name: is this version already on npm?
+        id: served
+        run: |
+          set -euo pipefail
+          PKG="$(jq -r .name package.json)"
+          VER="$(jq -r .version package.json)"
+          if curl -fsSL "https://registry.npmjs.org/${PKG}" | jq -e --arg v "$VER" '.versions[$v]' >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "npm already serves ${PKG}@${VER} — skipping publish, continuing to the registry"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # No NODE_AUTH_TOKEN. Authentication is the OIDC token above, exchanged
       # for a short-lived credential. Provenance is attached automatically.
-      - run: npm publish --access public
+      - if: steps.served.outputs.already == 'false'
+        run: npm publish --access public
+
+  # The npm publish above is only half of a release: the MCP registry entry
+  # points at a package version, and left behind it advertises the old one.
+  # shadowjoin's registry entries were pushed by hand until 0.4.0, which is
+  # why 0.3.x landed on npm and the listing lagged.
+  mcp-registry:
+    needs: npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install mcp-publisher
+        run: |
+          set -euo pipefail
+          # The release assets carry no version in their filename — the version
+          # lives only in the tag — so resolve the tag and keep the asset name
+          # fixed. Download, verify, then extract: never pipe a download into a
+          # program, because a piped download runs whatever arrives.
+          TAG="$(curl -fsSL https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | jq -r .tag_name)"
+          VER="${TAG#v}"
+          BASE="https://github.com/modelcontextprotocol/registry/releases/download/${TAG}"
+          curl -fsSL -o mcp-publisher_linux_amd64.tar.gz "${BASE}/mcp-publisher_linux_amd64.tar.gz"
+          curl -fsSL -o checksums.txt "${BASE}/registry_${VER}_checksums.txt"
+          grep " mcp-publisher_linux_amd64.tar.gz$" checksums.txt | sha256sum --check --status
+          echo "checksum verified"
+          tar xzf mcp-publisher_linux_amd64.tar.gz mcp-publisher
+          chmod +x mcp-publisher
+          ./mcp-publisher --version
+
+      - name: the registry version must match the package version
+        run: |
+          set -euo pipefail
+          PKG="$(jq -r .version package.json)"
+          SRV="$(jq -r .version server.json)"
+          SRVPKG="$(jq -r '.packages[0].version' server.json)"
+          if [ "$PKG" != "$SRV" ] || [ "$PKG" != "$SRVPKG" ]; then
+            echo "version drift: package.json=$PKG server.json=$SRV packages[0]=$SRVPKG"
+            exit 1
+          fi
+          echo "all three agree on $PKG"
+
+      # The registry refuses to register a version npm does not serve yet, and
+      # npm's propagation can outlast a registry token's lifetime. Wait for npm
+      # FIRST, then authenticate, so the token is minted against a version the
+      # registry can already see.
+      - name: wait for npm to serve this version
+        run: |
+          set -euo pipefail
+          PKG="$(jq -r '.packages[0].identifier' server.json)"
+          VER="$(jq -r '.packages[0].version' server.json)"
+          for i in $(seq 1 30); do
+            if curl -fsSL "https://registry.npmjs.org/${PKG}" | jq -e --arg v "$VER" '.versions[$v]' >/dev/null 2>&1; then
+              echo "npm serves ${PKG}@${VER} after $((i * 10))s"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "npm did not serve ${PKG}@${VER} within 300s"
+          exit 1
+
+      - run: ./mcp-publisher login github-oidc
+      - run: ./mcp-publisher publish
