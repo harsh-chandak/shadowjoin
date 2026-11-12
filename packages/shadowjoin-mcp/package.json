@@ -1,13 +1,13 @@
 {
   "name": "shadowjoin-mcp",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "The shadowjoin MCP server, launchable as `npx shadowjoin-mcp` with no extra arguments.",
   "type": "module",
   "bin": {
     "shadowjoin-mcp": "bin.mjs"
   },
   "dependencies": {
-    "shadowjoin": "0.4.0",
+    "shadowjoin": "0.4.1",
     "@modelcontextprotocol/sdk": "^1.32.1"
   },
   "files": [

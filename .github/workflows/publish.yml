@@ -59,8 +59,46 @@ jobs:
   # points at a package version, and left behind it advertises the old one.
   # shadowjoin's registry entries were pushed by hand until 0.4.0, which is
   # why 0.3.x landed on npm and the listing lagged.
-  mcp-registry:
+  # The registry resolves the launcher, so the launcher must be on npm before
+  # mcp-publisher runs. Its first version was published by hand because npm's
+  # trusted publishing cannot bootstrap a name that does not exist; from here
+  # it releases in lockstep with the package it launches.
+  launcher:
     needs: npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: packages/shadowjoin-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - run: npm install -g npm@latest
+
+      - name: is this version already on npm?
+        id: served
+        run: |
+          set -euo pipefail
+          PKG="$(jq -r .name package.json)"
+          VER="$(jq -r .version package.json)"
+          if curl -fsSL --proto '=https' --proto-redir '=https' "https://registry.npmjs.org/${PKG}" | jq -e --arg v "$VER" '.versions[$v]' >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "npm already serves ${PKG}@${VER} — skipping"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # No build step: the launcher is one file and carries no dist/.
+      - if: steps.served.outputs.already == 'false'
+        run: npm publish --access public
+
+  mcp-registry:
+    needs: [npm, launcher]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -86,17 +124,28 @@ jobs:
           chmod +x mcp-publisher
           ./mcp-publisher --version
 
-      - name: the registry version must match the package version
+      # Four files now have to agree, not three. packages[0].identifier names
+      # the LAUNCHER, so packages[0].version is the launcher's version — the
+      # old gate compared it against this package's and would have passed
+      # while the registry resolved a launcher version npm had never served.
+      - name: every version and the identifier must agree
         run: |
           set -euo pipefail
           PKG="$(jq -r .version package.json)"
           SRV="$(jq -r .version server.json)"
           SRVPKG="$(jq -r '.packages[0].version' server.json)"
-          if [ "$PKG" != "$SRV" ] || [ "$PKG" != "$SRVPKG" ]; then
-            echo "version drift: package.json=$PKG server.json=$SRV packages[0]=$SRVPKG"
-            exit 1
-          fi
-          echo "all three agree on $PKG"
+          SRVID="$(jq -r '.packages[0].identifier' server.json)"
+          LNAME="$(jq -r .name packages/shadowjoin-mcp/package.json)"
+          LVER="$(jq -r .version packages/shadowjoin-mcp/package.json)"
+          LDEP="$(jq -r '.dependencies["shadowjoin"]' packages/shadowjoin-mcp/package.json)"
+          fail=0
+          [ "$PKG" = "$SRV" ]   || { echo "server.json version $SRV != package.json $PKG"; fail=1; }
+          [ "$PKG" = "$SRVPKG" ] || { echo "packages[0].version $SRVPKG != $PKG"; fail=1; }
+          [ "$PKG" = "$LVER" ]  || { echo "launcher version $LVER != $PKG"; fail=1; }
+          [ "$PKG" = "$LDEP" ]  || { echo "launcher depends on shadowjoin@$LDEP, not $PKG"; fail=1; }
+          [ "$SRVID" = "$LNAME" ] || { echo "packages[0].identifier $SRVID is not the launcher $LNAME"; fail=1; }
+          [ $fail -eq 0 ] || exit 1
+          echo "package, server.json, launcher and its dependency all agree on $PKG; identifier is $SRVID"
 
       # The registry refuses to register a version npm does not serve yet, and
       # npm's propagation can outlast a registry token's lifetime. Wait for npm
